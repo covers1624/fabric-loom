@@ -1,0 +1,105 @@
+plugins {
+	id 'java'
+	id 'maven-publish'
+	id 'java-gradle-plugin'
+	id 'idea'
+	id 'eclipse'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+group = 'net.fabricmc'
+archivesBaseName = project.name
+version = '0.1.0-SNAPSHOT'
+
+def build = "local"
+def ENV = System.getenv()
+if (ENV.BUILD_NUMBER) {
+	build = "jenkins #${ENV.BUILD_NUMBER}"
+}
+
+repositories {
+	mavenCentral()
+	maven {
+		name = "Fabric"
+		url = 'https://maven.fabricmc.net/'
+	}
+}
+
+dependencies {
+	implementation gradleApi()
+
+	implementation ('commons-io:commons-io:2.6')
+	implementation ('org.zeroturnaround:zt-zip:1.13')
+	implementation ('com.google.code.gson:gson:2.8.5')
+	implementation ('com.google.guava:guava:27.0.1-jre')
+	implementation ('net.fabricmc:stitch:0.1.0.25')
+	implementation ('net.fabricmc:tiny-remapper:0.1.0.20') {
+		transitive = false
+	}
+//	implementation ('org.benf:cfr:0.136')
+	implementation ('org.jetbrains:intellij-fernflower:1.0.0.2')
+
+	implementation ('net.fabricmc:sponge-mixin:0.7.11.10') {
+		exclude module: 'launchwrapper'
+		exclude module: 'guava'
+	}
+}
+
+jar {
+	manifest {
+		attributes 'Implementation-Version': version + " Build(" + build + ")"
+	}
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+	classifier = 'sources'
+	from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+	classifier = 'javadoc'
+	from javadoc.destinationDir
+}
+
+apply from: 'https://github.com/FabricMC/fabric-docs/raw/master/gradle/license.gradle'
+
+task wrapper(type: Wrapper) {
+	gradleVersion = '4.10.2'
+}
+
+gradlePlugin {
+	plugins {
+		register("fabricLoom") {
+			id = "fabric-loom"
+			implementationClass = "net.fabricmc.loom.LoomGradlePlugin"
+		}
+	}
+}
+
+publishing {
+	publications {
+		plugin(MavenPublication) { publication ->
+			groupId project.group
+			artifactId project.archivesBaseName
+			version project.version
+
+			from components["java"]
+	
+			artifact sourcesJar
+			artifact javadocJar
+		}
+	}
+	repositories {
+		maven {
+			url "http://mavenupload.modmuss50.me/"
+			if (project.hasProperty('mavenPass')) {
+				credentials {
+					username 'buildslave'
+					password project.getProperty('mavenPass')
+				}
+			}
+		}
+	}
+}
